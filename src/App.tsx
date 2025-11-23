@@ -1,145 +1,172 @@
-import { useState, useEffect } from 'react'
-import './App.css'
+import { useState, useEffect, useRef } from 'react'
+import { motion } from 'motion/react'
+import { CoffeeCup } from './components/CoffeeCup.tsx'
+import { SessionTracker } from './components/SessionTracker.tsx'
+import { TimerControls } from './components/TimerControls.tsx'
 
-function App() {
-    const FOCUS_TIME = 25 * 60
-    const BREAK_TIME = 5 * 60
+const WORK_TIME = 25 * 60 // 25 minutes in seconds
+const BREAK_TIME = 5 * 60 // 5 minutes in seconds
+const TOTAL_SESSIONS = 4
 
-    const [isActive, setIsActive] = useState<boolean>(false)
-    const [seconds, setSeconds] = useState<number>(FOCUS_TIME)
-    const [mode, setMode] = useState<'focus' | 'break'>('focus')
+export default function App() {
+    const [timeLeft, setTimeLeft] = useState(WORK_TIME)
+    const [isRunning, setIsRunning] = useState(false)
+    const [isBreak, setIsBreak] = useState(false)
+    const [completedSessions, setCompletedSessions] = useState(0)
+    const intervalRef = useRef<number | null>(null)
+
+    const currentDuration = isBreak ? BREAK_TIME : WORK_TIME
+    const fillPercentage = isBreak
+        ? (timeLeft / currentDuration) * 100 // Drain during break (100% -> 0%)
+        : ((currentDuration - timeLeft) / currentDuration) * 100 // Fill during work (0% -> 100%)
 
     useEffect(() => {
-        if (!isActive) return
+        if (isRunning && timeLeft > 0) {
+            intervalRef.current = window.setInterval(() => {
+                setTimeLeft((prev) => prev - 1)
+            }, 1000) // Changed to 1000ms for real seconds
+        } else if (timeLeft === 0) {
+            // Timer completed
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current)
+            }
 
-        const interval = setInterval(() => {
-            setSeconds((p) => {
-                if (p <= 0) {
-                    if (mode === 'focus') {
-                        setMode('break')
-                        playBeep()
-                        return BREAK_TIME
-                    }
+            // Play notification sound or show alert
+            const message = !isBreak
+                ? 'Focus session complete! Time for a break.'
+                : 'Break is over! Time to focus.'
 
-                    if (mode === 'break') {
-                        setMode('focus')
-                        playBeep()
-                        return FOCUS_TIME
-                    }
-                }
-                return p - 1
-            })
-        }, 1000)
+            // Small timeout to allow the UI to update to 00:00 before alerting
+            setTimeout(() => {
+                alert(message)
+            }, 100)
+
+            if (!isBreak) {
+                // Work session completed, increment session counter
+                setCompletedSessions((prev) =>
+                    Math.min(prev + 1, TOTAL_SESSIONS)
+                )
+                setIsBreak(true)
+                setTimeLeft(BREAK_TIME)
+            } else {
+                // Break completed, start new work session
+                setIsBreak(false)
+                setTimeLeft(WORK_TIME)
+            }
+
+            setIsRunning(false)
+        }
 
         return () => {
-            clearInterval(interval)
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current)
+            }
         }
-    }, [isActive, mode, BREAK_TIME, FOCUS_TIME, seconds])
+    }, [isRunning, timeLeft, isBreak])
 
-    const startTimer = () => {
-        setIsActive(true)
-    }
-    const stopTimer = () => {
-        setIsActive(false)
-    }
-    const resetTimer = () => {
-        setIsActive(false)
-        setSeconds(FOCUS_TIME)
-        setMode('focus')
+    const handleStart = () => {
+        // Request notification permission on first start
+        if (Notification.permission === 'default') {
+            Notification.requestPermission()
+        }
+        setIsRunning(true)
     }
 
-    function playBeep() {
-        const ctx = new window.AudioContext()
-        const oscillator = ctx.createOscillator()
-        const gain = ctx.createGain()
+    const handlePause = () => {
+        setIsRunning(false)
+    }
 
-        oscillator.type = 'sine' // can be 'square', 'triangle', etc.
-        oscillator.frequency.setValueAtTime(440, ctx.currentTime) // A4 note
-        gain.gain.setValueAtTime(0.1, ctx.currentTime) // volume
+    const handleReset = () => {
+        setIsRunning(false)
+        setTimeLeft(isBreak ? BREAK_TIME : WORK_TIME)
+    }
 
-        oscillator.connect(gain)
-        gain.connect(ctx.destination)
+    const handleFullReset = () => {
+        setIsRunning(false)
+        setIsBreak(false)
+        setTimeLeft(WORK_TIME)
+        setCompletedSessions(0)
+    }
 
-        oscillator.start()
-        oscillator.stop(ctx.currentTime + 0.1)
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        return `${mins.toString().padStart(2, '0')}:${secs
+            .toString()
+            .padStart(2, '0')}`
     }
 
     return (
-        <>
-            {/* update add a circle loading time */}
-            {/* <svg className="progress-ring" width="120" height="120">
-                <circle
-                    className="progress-ring__track"
-                    stroke="#e6e6e6"
-                    stroke-width="8"
-                    fill="transparent"
-                    r="54"
-                    cx="60"
-                    cy="60"
-                />
-                <circle
-                    className="progress-ring__circle"
-                    stroke="#4f46e5"
-                    stroke-width="8"
-                    fill="transparent"
-                    r="54"
-                    cx="60"
-                    cy="60"
-                    stroke-linecap="round"
-                    strokeDasharray={339}
-                    strokeDashoffset={167}
-                />
-            </svg> */}
+        <div className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-br from-coffee-50 via-coffee-100 to-coffee-200">
+            <div className="max-w-md w-full flex flex-col items-center gap-8">
+                {/* Header */}
+                <div className="text-center">
+                    <h1 className="text-5xl font-bold text-coffee-900 mb-2 tracking-tight">
+                        PomoBrew
+                    </h1>
+                    <p className="text-lg text-coffee-700 font-light">
+                        {isBreak ? 'Take a sip & relax' : 'Brewing your focus'}
+                    </p>
+                </div>
 
-            <div style={{ fontSize: '4rem' }}>{`${String(
-                Math.floor(seconds / 60)
-            ).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`}</div>
+                {/* Coffee Cup Visualization */}
+                <div className="relative w-full flex justify-center py-4">
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-coffee-200/50 rounded-full blur-3xl -z-10 transform translate-y-10" />
 
-            <div
-                className="loading-track"
-                style={{
-                    background: 'black',
-                    opacity: 0.2,
-                    height: 40,
-                    width: 200,
-                    marginBottom: 24,
-                }}
-            >
-                {mode == 'focus' ? (
-                    <div
-                        className="loading-inner"
-                        style={{
-                            width: `${
-                                ((FOCUS_TIME - seconds) / FOCUS_TIME) * 100
-                            }%`,
-                            background: 'lightblue',
-                            height: '100%',
-                        }}
+                    <CoffeeCup
+                        fillPercentage={fillPercentage}
+                        isBreak={isBreak}
+                        isRunning={isRunning}
                     />
-                ) : (
-                    <div
-                        className="loading-inner"
-                        style={{
-                            width: `${(seconds / BREAK_TIME) * 100}%`,
+                </div>
 
-                            background: 'green',
-                            height: '100%',
-                        }}
+                {/* Timer Card */}
+                <div className="w-full bg-white/60 backdrop-blur-md rounded-3xl p-8 shadow-xl border border-white/50 flex flex-col items-center gap-6">
+                    <div className="text-center">
+                        <div className="text-7xl font-bold text-coffee-800 mb-2 font-mono tracking-tighter">
+                            {formatTime(timeLeft)}
+                        </div>
+                        <div className="text-coffee-600 uppercase tracking-widest text-xs font-bold">
+                            {isBreak ? 'Break Time' : 'Focus Session'}
+                        </div>
+                    </div>
+
+                    <TimerControls
+                        isRunning={isRunning}
+                        isBreak={isBreak}
+                        onStart={handleStart}
+                        onPause={handlePause}
+                        onReset={handleReset}
                     />
+                </div>
+
+                <SessionTracker
+                    completedSessions={completedSessions}
+                    totalSessions={TOTAL_SESSIONS}
+                />
+
+                {/* Reset and completion messages */}
+                {completedSessions > 0 && (
+                    <div className="text-center">
+                        <button
+                            onClick={handleFullReset}
+                            className="text-sm text-coffee-600 hover:text-coffee-800 underline decoration-coffee-400 underline-offset-4 transition-colors"
+                        >
+                            Reset All Sessions
+                        </button>
+                    </div>
+                )}
+
+                {completedSessions === TOTAL_SESSIONS && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 bg-coffee-600 text-white text-center rounded-xl shadow-lg font-medium w-full"
+                    >
+                        🎉 All sessions completed! Time for a fresh brew.
+                    </motion.div>
                 )}
             </div>
-
-            {!isActive ? (
-                <button onClick={startTimer}>Start</button>
-            ) : (
-                <button onClick={stopTimer}>Stop</button>
-            )}
-
-            <button onClick={resetTimer}>Reset</button>
-
-            {/* Add Options for custom work time i.e 10m 15m 20m */}
-        </>
+        </div>
     )
 }
-
-export default App
