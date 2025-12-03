@@ -19,7 +19,7 @@ export function CoffeeCup({
     const liquidY = 214 - currentHeight
 
     return (
-        <div className="relative flex items-center justify-center py-12">
+        <div className="relative flex items-center justify-center">
             <div className="relative w-64 h-64">
                 <svg
                     viewBox="0 0 240 240"

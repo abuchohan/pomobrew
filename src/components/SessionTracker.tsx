@@ -11,7 +11,7 @@ export function SessionTracker({
     totalSessions,
 }: SessionTrackerProps) {
     return (
-        <div className="flex flex-col items-center gap-4 p-6 bg-white/80 rounded-xl shadow-sm">
+        <div className="flex flex-col items-center gap-1 py-2 bg-white/80 rounded-xl shadow-sm w-full">
             <h3 className="text-coffee-900 font-medium">Daily Progress</h3>
             <div className="flex gap-3">
                 {Array.from({ length: totalSessions }).map((_, index) => (

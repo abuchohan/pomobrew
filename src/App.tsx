@@ -3,6 +3,8 @@ import { motion } from 'motion/react'
 import { CoffeeCup } from './components/CoffeeCup.tsx'
 import { SessionTracker } from './components/SessionTracker.tsx'
 import { TimerControls } from './components/TimerControls.tsx'
+import { Modal } from './components/Modal.tsx'
+import { playNotificationSound } from './utils/sound.ts'
 
 const WORK_TIME = 25 * 60 // 25 minutes in seconds
 const BREAK_TIME = 5 * 60 // 5 minutes in seconds
@@ -14,6 +16,18 @@ export default function App() {
     const [isBreak, setIsBreak] = useState(false)
     const [completedSessions, setCompletedSessions] = useState(0)
     const intervalRef = useRef<number | null>(null)
+
+    const [modalConfig, setModalConfig] = useState<{
+        isOpen: boolean
+        title: string
+        message: string
+        actionLabel?: string
+        onAction?: () => void
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+    })
 
     const currentDuration = isBreak ? BREAK_TIME : WORK_TIME
     const fillPercentage = isBreak
@@ -31,15 +45,20 @@ export default function App() {
                 clearInterval(intervalRef.current)
             }
 
-            // Play notification sound or show alert
-            const message = !isBreak
-                ? 'Focus session complete! Time for a break.'
-                : 'Break is over! Time to focus.'
+            playNotificationSound()
 
-            // Small timeout to allow the UI to update to 00:00 before alerting
-            setTimeout(() => {
-                alert(message)
-            }, 100)
+            const title = !isBreak ? 'Focus Session Complete!' : 'Break Over!'
+            const message = !isBreak
+                ? 'Great job! Time to recharge with a coffee break.'
+                : 'Hope you feel refreshed! Ready to brew some more focus?'
+
+            setModalConfig({
+                isOpen: true,
+                title,
+                message,
+                actionLabel: !isBreak ? 'Start Break' : 'Start Focus',
+                onAction: () => handleStart(),
+            })
 
             if (!isBreak) {
                 // Work session completed, increment session counter
@@ -110,7 +129,7 @@ export default function App() {
                 </div>
 
                 {/* Coffee Cup Visualization */}
-                <div className="relative w-full flex justify-center py-4">
+                <div className="relative w-full flex justify-center">
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-coffee-200/50 rounded-full blur-3xl -z-10 transform translate-y-10" />
 
                     <CoffeeCup
@@ -119,6 +138,11 @@ export default function App() {
                         isRunning={isRunning}
                     />
                 </div>
+
+                <SessionTracker
+                    completedSessions={completedSessions}
+                    totalSessions={TOTAL_SESSIONS}
+                />
 
                 {/* Timer Card */}
                 <div className="w-full bg-white/60 backdrop-blur-md rounded-3xl p-8 shadow-xl border border-white/50 flex flex-col items-center gap-6">
@@ -139,11 +163,6 @@ export default function App() {
                         onReset={handleReset}
                     />
                 </div>
-
-                <SessionTracker
-                    completedSessions={completedSessions}
-                    totalSessions={TOTAL_SESSIONS}
-                />
 
                 {/* Reset and completion messages */}
                 {completedSessions > 0 && (
@@ -167,6 +186,17 @@ export default function App() {
                     </motion.div>
                 )}
             </div>
+
+            <Modal
+                isOpen={modalConfig.isOpen}
+                onClose={() =>
+                    setModalConfig((prev) => ({ ...prev, isOpen: false }))
+                }
+                title={modalConfig.title}
+                message={modalConfig.message}
+                actionLabel={modalConfig.actionLabel}
+                onAction={modalConfig.onAction}
+            />
         </div>
     )
 }
